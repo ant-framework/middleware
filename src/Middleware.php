@@ -82,6 +82,7 @@ class Middleware
 
             $result = $destination(...$arguments);
             $isSend = ($result !== null);
+            //7.0之前使用第二次协同返回数据,7.0之后通过getReturn返回数据
             $getReturnValue = version_compare(PHP_VERSION, '7.0.0', '>=');
             //回调函数栈
             while ($generator = array_pop($stack)) {
@@ -93,9 +94,9 @@ class Middleware
                 }
 
                 if ($getReturnValue) {
-                    $result = $generator->getReturn() ?: $result;
+                    $result = $generator->getReturn();
                     $isSend = ($result !== null);
-                }else{
+                }elseif(null === $result = $generator->current()){
                     $isSend = false;
                 }
             }
@@ -106,7 +107,7 @@ class Middleware
                 throw $e;
             };
 
-            if(!empty($stack)){
+            if(isset($stack)){
                 //将异常交给中间件进行处理
                 $exceptionHandle = $this->createExceptionHandle($stack,$exceptionHandle);
             }
