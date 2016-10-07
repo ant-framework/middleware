@@ -23,6 +23,7 @@ Ant框架使用的中间件
 
 
 ### 使用
+
 ```php
 use Ant\Middleware\Middleware;
 use Ant\Middleware\Arguments;
@@ -57,6 +58,7 @@ $handle = [
 > `then`中闭包函数返回的值，会在恢复中间件的时候传递给每个协同函数，协同函数可以通过`$message = yield`这样的语法来获取值(更详细的语法可以去参考PHP手册)，根据不同的版本有两种方式来改变重新入栈时传递的值，PHP7以上通过`return`就可以改变传递的值，5.6使用第二个`yield`返回，注意是`第二个`
 
 * PHP7改变传递的值
+
 ```php
 /////////////////// PHP7 ///////////////////
 use Ant\Middleware\Middleware;
@@ -80,7 +82,9 @@ $handle = [
 });
 // output "hello world"
 ```
+
 * PHP5.6改变传递的值
+
 ```
 /////////////////// PHP5.6 ///////////////////
 use Ant\Middleware\Middleware;
@@ -104,11 +108,12 @@ $handle = [
 });
 ```
 
-
 ### 打断中间件调用链
+
 * 打断调用链有两种方式，一种是`yield false`，一种是抛出异常
 
 > `yield false` 这种方式会打断中间件的调用，但是依旧会执行then中的闭包函数
+
 ```php
 use Ant\Middleware\Middleware;
 use Ant\Middleware\Arguments;
