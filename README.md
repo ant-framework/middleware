@@ -1,5 +1,5 @@
 Ant框架使用的中间件
-=======================================
+==
 
 ## 中间件运行流程
 
@@ -18,14 +18,14 @@ Ant框架使用的中间件
 > 2. 每次`yield`后，会挂起当前中间件，执行下一个中间件
 > 3. `yield`不是必须的，如果没有`yield`，此中间件被执行完毕之后不会被再次回调
 > 4. 在执行完`function`之后会尝试恢复之前挂起的中间件，恢复的时候可以进行传值
-> 5. 如果出现了异常，中间件的调用链会停止，并且恢复之前挂起的中间件，尝试使用这些恢复的中间件处理异常
+> 5. 如果出现了异常，中间件的调用链会停止，然后恢复之前挂起的中间件，尝试使用这些中间件处理异常
 > 6. 参考 : http://php.net/manual/zh/language.generators.syntax.php
 
 
 ### 使用
 
 ```php
-use Ant\Middleware\Middleware;
+use Ant\Middleware\Pipeline;
 use Ant\Middleware\Arguments;
 
 require 'vendor/autoload.php';
@@ -43,11 +43,11 @@ $handle = [
     }
 ];
 
-(new Middleware)				    //实例中间件
+echo (new Pipeline)				    //实例中间件
 	->send('hello')                 //要通过中间件变量
 	->through($handle)              //使用的中间件,必须为可回调类型(callable类型)
 	->then(function($str1,$str2){   //挂起所有中间件之后回调的函数
-	    echo "($str1 $str2)";
+	    return "($str1 $str2)";
 	});
 
 // output "123456(hello world)654321"
@@ -61,7 +61,7 @@ $handle = [
 
 ```php
 /////////////////// PHP7 ///////////////////
-use Ant\Middleware\Middleware;
+use Ant\Middleware\Pipeline;
 use Ant\Middleware\Arguments;
 
 require 'vendor/autoload.php';
@@ -69,17 +69,17 @@ require 'vendor/autoload.php';
 $handle = [
     function(){
         $returnInfo = yield;
-        echo $returnInfo;
-    },
-    function(){
-        $returnInfo = yield;
         return $returnInfo.' world';  //使用return改变传递参数
     }
 ];
 
-(new Middleware)->send('hello')->through($handle)->then(function($hello){
-    return $hello;
-});
+echo (new Pipeline)
+    ->send('hello')
+    ->through($handle)
+    ->then(function($hello){
+        return $hello;
+    });
+
 // output "hello world"
 ```
 
@@ -87,7 +87,7 @@ $handle = [
 
 ```
 /////////////////// PHP5.6 ///////////////////
-use Ant\Middleware\Middleware;
+use Ant\Middleware\Pipeline;
 use Ant\Middleware\Arguments;
 
 require 'vendor/autoload.php';
@@ -95,17 +95,18 @@ require 'vendor/autoload.php';
 $handle = [
     function(){
         $returnInfo = yield;
-        echo $returnInfo;
-    },
-    function(){
-        $returnInfo = yield;
         yield $returnInfo.' world';  // 使用yield传递传递参数
     }
 ];
 
-(new Middleware)->send('hello')->through($handle)->then(function(){
-    return $hello;
-});
+echo (new Pipeline)
+    ->send('hello')
+    ->through($handle)
+    ->then(function(){
+        return $hello;
+    });
+
+// output "hello world"
 ```
 
 ### 打断中间件调用链
@@ -115,7 +116,7 @@ $handle = [
 > `yield false` 这种方式会打断中间件的调用，但是依旧会执行then中的闭包函数
 
 ```php
-use Ant\Middleware\Middleware;
+use Ant\Middleware\Pipeline;
 use Ant\Middleware\Arguments;
 
 require 'vendor/autoload.php';
@@ -133,7 +134,7 @@ $handle = [
     },
 ];
 
-(new Middleware)->send()->through($handle)->then(function(){
+(new Pipeline)->send()->through($handle)->then(function(){
     echo 'hello world';
 });
 
@@ -145,7 +146,7 @@ $handle = [
  * 注意：在中间件中捕获时要注意，异常是在`yield`处抛出，如果有必须执行并且与异常无关的代码请放在`yield`前执行，因为异常的抛出可能会让这些代码无法执行
 
 ```php
-use Ant\Middleware\Middleware;
+use Ant\Middleware\Pipeline;
 use Ant\Middleware\Arguments;
 
 require 'vendor/autoload.php';
@@ -171,7 +172,7 @@ $handle = [
     },
 ];
 
-(new Middleware)->send()->through($handle)->then(function(){
+(new Pipeline)->send()->through($handle)->then(function(){
     echo 'hello world';
 });
 
