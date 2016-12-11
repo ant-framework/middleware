@@ -2,6 +2,7 @@
 namespace Ant\Middleware;
 
 use Closure;
+use Doctrine\Instantiator\Exception\InvalidArgumentException;
 use Generator;
 use Exception;
 
@@ -16,7 +17,7 @@ class Pipeline
      *
      * @var array
      */
-    protected $handlers = [];
+    protected $nodes = [];
 
     /**
      * 执行时传递给每个中间件的参数
@@ -41,25 +42,27 @@ class Pipeline
     }
 
     /**
-     *
+     * 添加一个中间件到顶部
      *
      * @param callable $callback
      * @return $this
      */
     public function unshift(callable $callback)
     {
-        array_unshift($this->handlers,$callback);
+        array_unshift($this->nodes,$callback);
 
         return $this;
     }
 
     /**
+     * 添加一个中间件到尾部
+     *
      * @param callable $callback
      * @return $this
      */
     public function push(callable $callback)
     {
-        array_push($this->handlers,$callback);
+        array_push($this->nodes,$callback);
 
         return $this;
     }
@@ -79,12 +82,20 @@ class Pipeline
     /**
      * 设置经过的中间件
      *
-     * @param $handle
+     * @param array|callable $nodes 经过的每个节点
      * @return $this
      */
-    public function through($handle)
+    public function through($nodes)
     {
-        $this->handlers = is_array($handle) ? $handle : func_get_args();
+        $nodes = is_array($nodes) ? $nodes : func_get_args();
+
+        foreach($nodes as $node){
+            if(!is_callable($node)){
+                throw new InvalidArgumentException('Pipeline must be a callback');
+            }
+        }
+
+        $this->nodes = $nodes;
 
         return $this;
     }
@@ -103,8 +114,8 @@ class Pipeline
         $arguments = $this->arguments;
 
         try{
-            foreach ($this->handlers as $handler) {
-                $generator = call_user_func_array($handler,$arguments);
+            foreach ($this->nodes as $node) {
+                $generator = call_user_func_array($node,$arguments);
 
                 if ($generator instanceof Generator) {
                     //将协同函数添加到函数栈
@@ -133,11 +144,9 @@ class Pipeline
                 }
 
                 //尝试用协同返回数据进行替换,如果无返回则继续使用之前结果
-                if ($this->getReturnValue) {
-                    $result = $generator->getReturn() ?: $result;
-                }else{
-                    $result = $generator->current() ?: $result;
-                }
+                $result = $this->getReturnValue
+                    ? ($generator->getReturn() ?: $result)
+                    : ($generator->current() ?: $result);
 
                 $isSend = ($result !== null);
             }
@@ -169,8 +178,8 @@ class Pipeline
         //如果一直无法处理,异常将会抛到最顶层来处理
         //如果处理了这个异常,那么异常回调链将会被打断
         //程序会返回至中间件启动的位置
-        return array_reduce($stack,function(Closure $stack,Generator $generator){
-            return function(Exception $exception)use($stack,$generator){
+        return array_reduce($stack,function(Closure $stack, Generator $generator){
+            return function(Exception $exception)use($stack, $generator){
                 try{
                     //将异常交给内层中间件
                     $generator->throw($exception);

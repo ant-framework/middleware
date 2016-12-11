@@ -30,7 +30,7 @@ use Ant\Middleware\Arguments;
 
 require 'vendor/autoload.php';
 
-$handle = [
+$nodes = [
     function($str1){
         echo 123;
         yield;
@@ -45,7 +45,7 @@ $handle = [
 
 echo (new Pipeline)				    //实例中间件
 	->send('hello')                 //要通过中间件变量
-	->through($handle)              //使用的中间件,必须为可回调类型(callable类型)
+	->through($nodes)              //使用的中间件,必须为可回调类型(callable类型)
 	->then(function($str1,$str2){   //挂起所有中间件之后回调的函数
 	    return "($str1 $str2)";
 	});
@@ -66,7 +66,7 @@ use Ant\Middleware\Arguments;
 
 require 'vendor/autoload.php';
 
-$handle = [
+$nodes = [
     function(){
         $returnInfo = yield;
         return $returnInfo.' world';  //使用return改变传递参数
@@ -75,7 +75,7 @@ $handle = [
 
 echo (new Pipeline)
     ->send('hello')
-    ->through($handle)
+    ->through($nodes)
     ->then(function($hello){
         return $hello;
     });
@@ -92,7 +92,7 @@ use Ant\Middleware\Arguments;
 
 require 'vendor/autoload.php';
 
-$handle = [
+$nodes = [
     function(){
         $returnInfo = yield;
         yield $returnInfo.' world';  // 使用yield传递传递参数
@@ -101,7 +101,7 @@ $handle = [
 
 echo (new Pipeline)
     ->send('hello')
-    ->through($handle)
+    ->through($nodes)
     ->then(function(){
         return $hello;
     });
@@ -121,7 +121,7 @@ use Ant\Middleware\Arguments;
 
 require 'vendor/autoload.php';
 
-$handle = [
+$nodes = [
     function(){
         echo 123;
         yield false;
@@ -134,7 +134,7 @@ $handle = [
     },
 ];
 
-(new Pipeline)->send()->through($handle)->then(function(){
+(new Pipeline)->send()->through($nodes)->then(function(){
     echo 'hello world';
 });
 
@@ -151,7 +151,7 @@ use Ant\Middleware\Arguments;
 
 require 'vendor/autoload.php';
 
-$handle = [
+$nodes = [
     function(){
         try{
             yield;
@@ -172,7 +172,7 @@ $handle = [
     },
 ];
 
-(new Pipeline)->send()->through($handle)->then(function(){
+(new Pipeline)->send()->through($nodes)->then(function(){
     echo 'hello world';
 });
 
