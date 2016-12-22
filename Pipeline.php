@@ -2,9 +2,9 @@
 namespace Ant\Middleware;
 
 use Closure;
-use Doctrine\Instantiator\Exception\InvalidArgumentException;
 use Generator;
 use Exception;
+use InvalidArgumentException;
 
 /**
  * Class Pipeline
@@ -177,7 +177,7 @@ class Pipeline
         //那么外层中间件会尝试捕获这个异常
         //如果一直无法处理,异常将会抛到最顶层来处理
         //如果处理了这个异常,那么异常回调链将会被打断
-        //程序会返回至中间件启动的位置
+        //异常处理后的值会返回至中间件调用的位置
         return array_reduce($stack,function(Closure $stack, Generator $generator){
             return function(Exception $exception)use($stack, $generator){
                 try{

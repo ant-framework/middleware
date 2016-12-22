@@ -113,7 +113,7 @@ echo (new Pipeline)
 
 * 打断调用链有两种方式，一种是`yield false`，一种是抛出异常
 
-> `yield false` 这种方式会打断中间件的调用，但是依旧会执行then中的闭包函数
+> `yield false` 这种方式会打断中间件的后续所有调用
 
 ```php
 use Ant\Middleware\Pipeline;
@@ -124,12 +124,12 @@ require 'vendor/autoload.php';
 $nodes = [
     function(){
         echo 123;
-        yield false;
+        yield;
         echo 321;
     },
     function(){
         echo 456;
-        yield;
+        yield false;
         echo 654;
     },
 ];
@@ -138,7 +138,7 @@ $nodes = [
     echo 'hello world';
 });
 
-//output "123hello world321"
+//output "123456"
 ```
 
 > 在中间件的运行过程中，如果出现异常，中间件的往下的调用链会被打断，然后开始回调中间件，回调的过程是以责任链的方式完成，如果`内层`中间件无法处理异常，那么`外层`中间件会尝试捕获这个异常，如果一直无法处理,异常将会抛到最顶层来处理，如果处理了这个异常，那么异常回调链将会被打断，程序会返回至中间件启动的位置（内层外层可以参考流程图）

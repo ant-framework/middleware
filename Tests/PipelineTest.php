@@ -135,4 +135,17 @@ class PipelineTest extends \PHPUnit_Framework_TestCase
         $output = ob_get_clean();
         $this->assertEquals('foobar',$output);
     }
+
+    public function testIllegalMiddleware()
+    {
+        $nodes = ['string',['foo'=>'bar']];
+
+        try{
+            (new Pipeline)->send()->through($nodes)->then(function(){
+                return "hello world";
+            });
+        }catch (\Exception $e){
+            $this->assertInstanceOf(\InvalidArgumentException::class,$e);
+        }
+    }
 }
