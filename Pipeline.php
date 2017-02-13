@@ -31,14 +31,14 @@ class Pipeline
      *
      * @var bool
      */
-    protected $getReturnValue = false;
+    protected $isPhp7 = false;
 
     /**
      * Middleware constructor.
      */
     public function __construct()
     {
-        $this->getReturnValue = version_compare(PHP_VERSION, '7.0.0', '>=');
+        $this->isPhp7 = version_compare(PHP_VERSION, '7.0.0', '>=');
     }
 
     /**
@@ -113,7 +113,7 @@ class Pipeline
         $stack = [];
         $arguments = $this->arguments;
 
-        try{
+        try {
             foreach ($this->nodes as $node) {
                 $generator = call_user_func_array($node,$arguments);
 
@@ -125,7 +125,7 @@ class Pipeline
                     if ($yieldValue === false) {
                         //打断中间件执行流程
                         return null;
-                    }elseif($yieldValue instanceof Arguments){
+                    } elseif($yieldValue instanceof Arguments) {
                         //替换传递参数
                         $arguments = $yieldValue->toArray();
                     }
@@ -133,25 +133,17 @@ class Pipeline
             }
 
             $result = $destination(...$arguments);
-            $isSend = ($result !== null);
             //回调函数栈
             while ($generator = array_pop($stack)) {
-                /* @var $generator Generator */
-                if ($isSend) {
-                    $generator->send($result);
-                }else{
-                    $generator->next();
-                }
+                $generator->send($result);
 
                 //尝试用协同返回数据进行替换,如果无返回则继续使用之前结果
-                $result = $this->getReturnValue
+                $result = $this->isPhp7
                     ? ($generator->getReturn() ?: $result)
                     : ($generator->current() ?: $result);
-
-                $isSend = ($result !== null);
             }
-        }catch(Exception $e){
-            $tryCatch = $this->exceptionHandle($stack,function($e){
+        } catch(Exception $e) {
+            $tryCatch = $this->exceptionHandle($stack, function ($e) {
                 //如果无法处理,交给上层应用处理
                 throw $e;
             });
@@ -178,16 +170,16 @@ class Pipeline
         //如果一直无法处理,异常将会抛到最顶层来处理
         //如果处理了这个异常,那么异常回调链将会被打断
         //异常处理后的值会返回至中间件调用的位置
-        return array_reduce($stack,function(Closure $stack, Generator $generator){
-            return function(Exception $exception)use($stack, $generator){
-                try{
+        return array_reduce($stack,function (Closure $stack, Generator $generator) {
+            return function (Exception $exception) use ($stack, $generator) {
+                try {
                     //将异常交给内层中间件
                     $generator->throw($exception);
 
-                    return $this->getReturnValue
+                    return $this->isPhp7
                         ? $generator->getReturn()
                         : $generator->current();
-                }catch(Exception $e) {
+                } catch(Exception $e) {
                     //将异常交给外层中间件
                     return $stack($e);
                 }
