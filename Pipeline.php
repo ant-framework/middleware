@@ -7,6 +7,8 @@ use Exception;
 use InvalidArgumentException;
 
 /**
+ * Todo Server版
+ *
  * Class Pipeline
  * @package Ant\Middleware
  */
@@ -89,8 +91,8 @@ class Pipeline
     {
         $nodes = is_array($nodes) ? $nodes : func_get_args();
 
-        foreach($nodes as $node){
-            if(!is_callable($node)){
+        foreach ($nodes as $node) {
+            if (!is_callable($node)) {
                 throw new InvalidArgumentException('Pipeline must be a callback');
             }
         }
@@ -136,7 +138,6 @@ class Pipeline
             //回调函数栈
             while ($generator = array_pop($stack)) {
                 $generator->send($result);
-
                 //尝试用协同返回数据进行替换,如果无返回则继续使用之前结果
                 $result = $this->isPhp7
                     ? ($generator->getReturn() ?: $result)
