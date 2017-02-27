@@ -8,6 +8,7 @@ use InvalidArgumentException;
 
 /**
  * Todo Server版
+ * Todo 尝试使用Context代替中间件传输参数
  *
  * Class Pipeline
  * @package Ant\Middleware
@@ -49,7 +50,7 @@ class Pipeline
      * @param callable $callback
      * @return $this
      */
-    public function unshift(callable $callback)
+    public function unShift(callable $callback)
     {
         array_unshift($this->nodes,$callback);
 
@@ -139,17 +140,15 @@ class Pipeline
             while ($generator = array_pop($stack)) {
                 $generator->send($result);
                 //尝试用协同返回数据进行替换,如果无返回则继续使用之前结果
-                $result = $this->isPhp7
-                    ? ($generator->getReturn() ?: $result)
-                    : ($generator->current() ?: $result);
+                $result = $this->getResult($generator);
             }
-        } catch(Exception $e) {
+        } catch(Exception $exception) {
             $tryCatch = $this->exceptionHandle($stack, function ($e) {
                 //如果无法处理,交给上层应用处理
                 throw $e;
             });
 
-            $result = $tryCatch($e);
+            $result = $tryCatch($exception);
         }
 
         return $result;
@@ -164,27 +163,36 @@ class Pipeline
      */
     protected function exceptionHandle($stack, $throw)
     {
-        //此处的异常处理是以责任链的方式完成
         //出现异常之后开始回调中间件函数栈
         //如果内层中间件无法处理异常
         //那么外层中间件会尝试捕获这个异常
         //如果一直无法处理,异常将会抛到最顶层来处理
         //如果处理了这个异常,那么异常回调链将会被打断
-        //异常处理后的值会返回至中间件调用的位置
         return array_reduce($stack,function (Closure $stack, Generator $generator) {
             return function (Exception $exception) use ($stack, $generator) {
                 try {
-                    //将异常交给内层中间件
+                    // 将异常交给内层中间件
                     $generator->throw($exception);
-
-                    return $this->isPhp7
-                        ? $generator->getReturn()
-                        : $generator->current();
-                } catch(Exception $e) {
-                    //将异常交给外层中间件
+                    // 异常处理成功,将结果返回给应用程序
+                    return $this->getResult($generator);
+                } catch (Exception $e) {
+                    // 将异常交给外层中间件
                     return $stack($e);
                 }
             };
         },$throw);
+    }
+
+    /**
+     * 获取协程函数返回的数据,php7获取return数据,php7以下使用第二次yield
+     *
+     * @param Generator $generator
+     * @return mixed
+     */
+    protected function getResult(Generator $generator)
+    {
+        return $this->isPhp7
+            ? $generator->getReturn()
+            : $generator->current();
     }
 }
