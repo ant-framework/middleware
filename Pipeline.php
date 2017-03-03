@@ -9,6 +9,7 @@ use InvalidArgumentException;
 /**
  * Todo Server版
  * Todo 尝试使用Context代替中间件传输参数
+ * Todo 中间件处理完异常后,继续回调剩下来的栈
  *
  * Class Pipeline
  * @package Ant\Middleware
@@ -128,7 +129,7 @@ class Pipeline
                     if ($yieldValue === false) {
                         //打断中间件执行流程
                         return null;
-                    } elseif($yieldValue instanceof Arguments) {
+                    } elseif ($yieldValue instanceof Arguments) {
                         //替换传递参数
                         $arguments = $yieldValue->toArray();
                     }
@@ -142,7 +143,7 @@ class Pipeline
                 //尝试用协同返回数据进行替换,如果无返回则继续使用之前结果
                 $result = $this->getResult($generator);
             }
-        } catch(Exception $exception) {
+        } catch (Exception $exception) {
             $tryCatch = $this->exceptionHandle($stack, function ($e) {
                 //如果无法处理,交给上层应用处理
                 throw $e;
@@ -168,7 +169,7 @@ class Pipeline
         //那么外层中间件会尝试捕获这个异常
         //如果一直无法处理,异常将会抛到最顶层来处理
         //如果处理了这个异常,那么异常回调链将会被打断
-        return array_reduce($stack,function (Closure $stack, Generator $generator) {
+        return array_reduce($stack, function (Closure $stack, Generator $generator) {
             return function (Exception $exception) use ($stack, $generator) {
                 try {
                     // 将异常交给内层中间件
