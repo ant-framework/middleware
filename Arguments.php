@@ -13,13 +13,10 @@ class Arguments
 
     /**
      * 注册传递的参数
-     *
-     * Arguments constructor.
-     * @param array $param
      */
-    public function __construct($param)
+    public function __construct()
     {
-        $this->arguments = is_array($param) ? $param : func_get_args();
+        $this->arguments = func_get_args();
     }
 
     /**

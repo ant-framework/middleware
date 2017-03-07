@@ -136,7 +136,7 @@ class Pipeline
                 }
             }
 
-            $result = $destination(...$arguments);
+            $result = call_user_func_array($destination, $arguments);
             //回调函数栈
             while ($generator = array_pop($stack)) {
                 $generator->send($result);
