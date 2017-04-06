@@ -107,45 +107,49 @@ class Pipeline
     /**
      * 设定中间件运行终点,并执行
      *
-     * @param Closure $destination
+     * @param callable $destination
      * @return mixed
      * @throws Exception
      */
-    public function then(Closure $destination)
+    public function then(callable $destination)
     {
-        //初始化参数
+        // 初始化参数
         $stack = [];
         $arguments = $this->arguments;
 
         try {
             foreach ($this->nodes as $node) {
-                $generator = call_user_func_array($node,$arguments);
+                $generator = call_user_func_array($node, $arguments);
 
                 if ($generator instanceof Generator) {
-                    //将协同函数添加到函数栈
+                    // 将协同函数添加到函数栈
                     $stack[] = $generator;
 
                     $yieldValue = $generator->current();
                     if ($yieldValue === false) {
-                        //打断中间件执行流程
-                        return null;
+                        // 打断中间件执行流程
+                        $status = false;
+                        break;
                     } elseif ($yieldValue instanceof Arguments) {
-                        //替换传递参数
+                        // 替换传递参数
                         $arguments = $yieldValue->toArray();
                     }
                 }
             }
 
-            $result = call_user_func_array($destination, $arguments);
-            //回调函数栈
+            $result = !isset($status) || $status !== false
+                ? call_user_func_array($destination, $arguments)
+                : null;
+
+            // 回调函数栈
             while ($generator = array_pop($stack)) {
                 $generator->send($result);
-                //尝试用协同返回数据进行替换,如果无返回则继续使用之前结果
+                // 尝试用协同返回数据进行替换,如果无返回则继续使用之前结果
                 $result = $this->getResult($generator);
             }
         } catch (Exception $exception) {
             $tryCatch = $this->exceptionHandle($stack, function ($e) {
-                //如果无法处理,交给上层应用处理
+                // 如果无法处理,交给上层应用处理
                 throw $e;
             });
 
@@ -164,11 +168,11 @@ class Pipeline
      */
     protected function exceptionHandle($stack, $throw)
     {
-        //出现异常之后开始回调中间件函数栈
-        //如果内层中间件无法处理异常
-        //那么外层中间件会尝试捕获这个异常
-        //如果一直无法处理,异常将会抛到最顶层来处理
-        //如果处理了这个异常,那么异常回调链将会被打断
+        // 出现异常之后开始回调中间件函数栈
+        // 如果内层中间件无法处理异常
+        // 那么外层中间件会尝试捕获这个异常
+        // 如果一直无法处理,异常将会抛到最顶层来处理
+        // 如果处理了这个异常,那么异常回调链将会被打断
         return array_reduce($stack, function (Closure $stack, Generator $generator) {
             return function (Exception $exception) use ($stack, $generator) {
                 try {
