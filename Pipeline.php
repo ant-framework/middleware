@@ -8,7 +8,6 @@ use InvalidArgumentException;
 
 /**
  * Todo Server版
- * Todo 尝试使用Context代替中间件传输参数
  * Todo 中间件处理完异常后,继续回调剩下来的栈
  *
  * Class Pipeline
@@ -22,13 +21,6 @@ class Pipeline
      * @var array
      */
     protected $nodes = [];
-
-    /**
-     * 执行时传递给每个中间件的参数
-     *
-     * @var array
-     */
-    protected $arguments = [];
 
     /**
      * 7.0之前使用第二次协同返回数据,7.0之后通过getReturn返回数据
@@ -46,50 +38,12 @@ class Pipeline
     }
 
     /**
-     * 添加一个中间件到顶部
-     *
-     * @param callable $callback
-     * @return $this
-     */
-    public function unShift(callable $callback)
-    {
-        array_unshift($this->nodes,$callback);
-
-        return $this;
-    }
-
-    /**
-     * 添加一个中间件到尾部
-     *
-     * @param callable $callback
-     * @return $this
-     */
-    public function push(callable $callback)
-    {
-        array_push($this->nodes,$callback);
-
-        return $this;
-    }
-
-    /**
-     * 设置在中间件中传输的参数
-     *
-     * @return self $this
-     */
-    public function send()
-    {
-        $this->arguments = func_get_args();
-
-        return $this;
-    }
-
-    /**
      * 设置经过的中间件
      *
      * @param array|callable $nodes 经过的每个节点
      * @return $this
      */
-    public function through($nodes)
+    public function insert($nodes)
     {
         $nodes = is_array($nodes) ? $nodes : func_get_args();
 
@@ -99,23 +53,22 @@ class Pipeline
             }
         }
 
-        $this->nodes = $nodes;
+        $this->nodes = array_merge($this->nodes, $nodes);
 
         return $this;
     }
 
     /**
-     * 设定中间件运行终点,并执行
-     *
-     * @param callable $destination
-     * @return mixed
-     * @throws Exception
+     * @param array $nodes
+     * @param ...$arguments
+     * @return mixed|null
      */
-    public function then(callable $destination)
+    public function pipe(array $nodes, ...$arguments)
     {
         // 初始化参数
         $stack = [];
-        $arguments = $this->arguments;
+        $result = null;
+        $this->insert($nodes);
 
         try {
             foreach ($this->nodes as $node) {
@@ -124,22 +77,18 @@ class Pipeline
                 if ($generator instanceof Generator) {
                     // 将协同函数添加到函数栈
                     $stack[] = $generator;
-
                     $yieldValue = $generator->current();
                     if ($yieldValue === false) {
                         // 打断中间件执行流程
-                        $status = false;
                         break;
                     } elseif ($yieldValue instanceof Arguments) {
                         // 替换传递参数
                         $arguments = $yieldValue->toArray();
                     }
+                } else {
+                    $result = $generator;
                 }
             }
-
-            $result = !isset($status) || $status !== false
-                ? call_user_func_array($destination, $arguments)
-                : null;
 
             // 回调函数栈
             while ($generator = array_pop($stack)) {
@@ -185,7 +134,7 @@ class Pipeline
                     return $stack($e);
                 }
             };
-        },$throw);
+        }, $throw);
     }
 
     /**

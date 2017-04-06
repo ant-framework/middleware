@@ -19,22 +19,22 @@ class PipelineTest extends \PHPUnit_Framework_TestCase
     public function testParameterTransfer()
     {
         ob_start();
-        $nodes = [
-            function(){
+
+        (new Pipeline())->pipe([
+            function () {
                 echo 123;
                 yield new Arguments('hello');
                 echo 321;
             },
-            function($str1){
+            function ($str1) {
                 echo 456;
                 yield new Arguments($str1,'world');
                 echo 654;
+            },
+            function ($str1,$str2) {
+                echo "($str1 $str2)";
             }
-        ];
-
-        (new Pipeline)->send()->through($nodes)->then(function($str1,$str2){
-            echo "($str1 $str2)";
-        });
+        ]);
 
         $output = ob_get_clean();
 
@@ -42,20 +42,19 @@ class PipelineTest extends \PHPUnit_Framework_TestCase
 
         //================================================//
 
-        $nodes = [
-            function($str){
+        (new Pipeline())->pipe([
+            function ($str) {
                 $this->assertEquals("foobar",$str);
                 yield new Arguments('hello');
             },
-            function($str){
+            function ($str) {
                 $this->assertEquals('hello',$str);
                 yield new Arguments($str,'world');
+            },
+            function ($str1,$str2) {
+                $this->assertEquals('hello world',"{$str1} {$str2}");
             }
-        ];
-
-        (new Pipeline)->send('foobar')->through($nodes)->then(function($str1,$str2){
-            $this->assertEquals('hello world',"{$str1} {$str2}");
-        });
+        ],"foobar");
     }
 
     /**
@@ -63,21 +62,25 @@ class PipelineTest extends \PHPUnit_Framework_TestCase
      */
     public function testEffectOfNodesOnTheReturnResult()
     {
-        if($this->isPHP7){
-            $pipeline = (new Pipeline)->push(function(){
+        $pipeline = new Pipeline();
+
+        if ($this->isPHP7) {
+            $pipeline->insert(function () {
                 $returnInfo = yield;
                 return $returnInfo.'bar';  //使用return改变传递参数
             });
-        }else{
-            $pipeline = (new Pipeline)->push(function(){
+        } else {
+            $pipeline->insert(function () {
                 $returnInfo = yield;
                 yield $returnInfo.'bar';  //PHP5.6协同不支持获取Return value
             });
         }
 
-        $result = $pipeline->send('foo')->then(function($foo){
-            return $foo;
-        });
+        $result = $pipeline->pipe([
+            function ($foo) {
+                return $foo;
+            }
+        ], "foo");
 
         $this->assertEquals("foobar",$result);
     }
@@ -88,49 +91,48 @@ class PipelineTest extends \PHPUnit_Framework_TestCase
     public function testInfluenceOfPipeNodeOnTheWholeProcess()
     {
         ob_start();
-        $nodes = [
-            function(){
+
+        (new Pipeline())->pipe([
+            function () {
                 echo 123;
                 yield;
-                echo 321;
             },
-            function(){
+            function () {
+                // 终止后续中间件
+                yield false;
                 echo 456;
-                yield false; //打断之后所有回调,直接在此结束
-                echo 654;
             },
-        ];
-
-        (new Pipeline)->send()->through($nodes)->then(function(){
-            echo 'foobar';
-        });
+            function () {
+                echo 'foobar';
+            }
+        ]);
 
         $output = ob_get_clean();
         $this->assertEquals('123456',$output);
 
         //================================================//
 
-        $nodes = [
-            function(){
-                try{
+        ob_start();
+
+        (new Pipeline)->pipe([
+            function () {
+                try {
                     yield;
-                }catch(\Exception $e){
+                } catch (\Exception $e) {
                     echo "foo".$e->getMessage();
                 }
             },
-            function(){
-                try{
+            function () {
+                try {
                     yield;
-                }catch(\RuntimeException $e){
+                } catch (\RuntimeException $e){
                     echo "fii".$e->getMessage();
                 }
+            },
+            function () {
+                throw new \Exception('bar');
             }
-        ];
-
-        ob_start();
-        (new Pipeline)->send()->through($nodes)->then(function(){
-            throw new \Exception('bar');
-        });
+        ]);
 
         $output = ob_get_clean();
         $this->assertEquals('foobar',$output);
@@ -138,13 +140,15 @@ class PipelineTest extends \PHPUnit_Framework_TestCase
 
     public function testIllegalMiddleware()
     {
-        $nodes = ['string',['foo'=>'bar']];
+        $nodes = ['string', ['foo'=>'bar']];
 
-        try{
-            (new Pipeline)->send()->through($nodes)->then(function(){
-                return "hello world";
-            });
-        }catch (\Exception $e){
+        try {
+            (new Pipeline)->insert($nodes)->pipe([
+                function () {
+                    return "hello world";
+                }
+            ]);
+        } catch (\Exception $e) {
             $this->assertInstanceOf(\InvalidArgumentException::class,$e);
         }
     }
