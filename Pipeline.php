@@ -30,10 +30,21 @@ class Pipeline
     protected $isPhp7 = false;
 
     /**
+     * @var Context
+     */
+    protected $context;
+
+    /**
+     * @var \SplStack
+     */
+    protected $stack;
+
+    /**
      * Middleware constructor.
      */
     public function __construct()
     {
+        $this->stack = new \SplStack();
         $this->isPhp7 = version_compare(PHP_VERSION, '7.0.0', '>=');
     }
 
@@ -60,81 +71,69 @@ class Pipeline
 
     /**
      * @param array $nodes
-     * @param ...$arguments
+     * @param ContextInterface $context
      * @return mixed|null
      */
-    public function pipe(array $nodes, ...$arguments)
+    public function pipe(array $nodes = [], ContextInterface $context = null)
     {
         // 初始化参数
-        $stack = [];
         $result = null;
         $this->insert($nodes);
+        $this->context = $context ?: new Context();
 
         try {
             foreach ($this->nodes as $node) {
-                $generator = call_user_func_array($node, $arguments);
+                $generator = call_user_func($node, $this->context);
 
-                if ($generator instanceof Generator) {
+                if (!$generator instanceof Generator) {
+                    $result = $generator;
+                } else {
                     // 将协同函数添加到函数栈
-                    $stack[] = $generator;
+                    $this->stack->push($generator);
                     $yieldValue = $generator->current();
+
+                    // Todo 通过信号进行判断,暂停,跳过,更改参数
                     if ($yieldValue === false) {
                         // 打断中间件执行流程
-                        break;
-                    } elseif ($yieldValue instanceof Arguments) {
-                        // 替换传递参数
-                        $arguments = $yieldValue->toArray();
+                        return false;
                     }
-                } else {
-                    $result = $generator;
                 }
             }
 
             // 回调函数栈
-            while ($generator = array_pop($stack)) {
+            while (!$this->stack->isEmpty()) {
+                $generator = $this->stack->pop();
                 $generator->send($result);
                 // 尝试用协同返回数据进行替换,如果无返回则继续使用之前结果
                 $result = $this->getResult($generator);
             }
         } catch (Exception $exception) {
-            $tryCatch = $this->exceptionHandle($stack, function ($e) {
-                // 如果无法处理,交给上层应用处理
-                throw $e;
-            });
-
-            $result = $tryCatch($exception);
+            $result = $this->tryCatch($exception);
         }
 
         return $result;
     }
 
     /**
-     * 处理异常
+     * 尝试捕获异常
      *
-     * @param $stack
-     * @param $throw
-     * @return Closure
+     * @param Exception $exception
+     * @return mixed
+     * @throws Exception
      */
-    protected function exceptionHandle($stack, $throw)
+    protected function tryCatch(\Exception $exception)
     {
-        // 出现异常之后开始回调中间件函数栈
-        // 如果内层中间件无法处理异常
-        // 那么外层中间件会尝试捕获这个异常
-        // 如果一直无法处理,异常将会抛到最顶层来处理
-        // 如果处理了这个异常,那么异常回调链将会被打断
-        return array_reduce($stack, function (Closure $stack, Generator $generator) {
-            return function (Exception $exception) use ($stack, $generator) {
-                try {
-                    // 将异常交给内层中间件
-                    $generator->throw($exception);
-                    // 异常处理成功,将结果返回给应用程序
-                    return $this->getResult($generator);
-                } catch (Exception $e) {
-                    // 将异常交给外层中间件
-                    return $stack($e);
-                }
-            };
-        }, $throw);
+        if ($this->stack->isEmpty()) {
+            throw $exception;
+        }
+
+        try {
+            $generator = $this->stack->pop();
+            $generator->throw($exception);
+            return $this->getResult($generator);
+        } catch (\Exception $e) {
+            $this->tryCatch($e);
+        }
     }
 
     /**

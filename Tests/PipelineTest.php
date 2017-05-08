@@ -2,7 +2,6 @@
 namespace Ant\Middleware;
 
 use Ant\Middleware\Pipeline;
-use Ant\Middleware\Arguments;
 
 class PipelineTest extends \PHPUnit_Framework_TestCase
 {
@@ -21,18 +20,20 @@ class PipelineTest extends \PHPUnit_Framework_TestCase
         ob_start();
 
         (new Pipeline())->pipe([
-            function () {
+            function ($ctx) {
                 echo 123;
-                yield new Arguments('hello');
+                $ctx->str1 = "hello";
+                yield;
                 echo 321;
             },
-            function ($str1) {
+            function ($ctx) {
                 echo 456;
-                yield new Arguments($str1,'world');
+                $ctx->str2 = "world";
+                yield;
                 echo 654;
             },
-            function ($str1,$str2) {
-                echo "($str1 $str2)";
+            function ($ctx) {
+                echo "({$ctx->str1} {$ctx->str2})";
             }
         ]);
 
@@ -43,18 +44,20 @@ class PipelineTest extends \PHPUnit_Framework_TestCase
         //================================================//
 
         (new Pipeline())->pipe([
-            function ($str) {
-                $this->assertEquals("foobar",$str);
-                yield new Arguments('hello');
+            function ($ctx) {
+                $this->assertEquals("bar", $ctx->foo);
+                $ctx->str1 = 'hello';
+                yield;
             },
-            function ($str) {
-                $this->assertEquals('hello',$str);
-                yield new Arguments($str,'world');
+            function ($ctx) {
+                $this->assertEquals('hello', $ctx->str1);
+                $ctx->str2 = 'world';
+                yield;
             },
-            function ($str1,$str2) {
-                $this->assertEquals('hello world',"{$str1} {$str2}");
+            function ($ctx) {
+                $this->assertEquals('hello world',"{$ctx->str1} {$ctx->str2}");
             }
-        ],"foobar");
+        ], new Context(['foo' => 'bar']));
     }
 
     /**
@@ -77,10 +80,10 @@ class PipelineTest extends \PHPUnit_Framework_TestCase
         }
 
         $result = $pipeline->pipe([
-            function ($foo) {
-                return $foo;
+            function () {
+                return 'foo';
             }
-        ], "foo");
+        ]);
 
         $this->assertEquals("foobar",$result);
     }
@@ -108,7 +111,7 @@ class PipelineTest extends \PHPUnit_Framework_TestCase
         ]);
 
         $output = ob_get_clean();
-        $this->assertEquals('123456',$output);
+        $this->assertEquals('123', $output);
 
         //================================================//
 
