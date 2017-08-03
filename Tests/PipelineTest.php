@@ -19,7 +19,7 @@ class PipelineTest extends \PHPUnit_Framework_TestCase
     {
         ob_start();
 
-        (new Pipeline())->pipe([
+        (new Pipeline())->pipe(null, [
             function ($ctx) {
                 echo 123;
                 $ctx->str1 = "hello";
@@ -43,7 +43,7 @@ class PipelineTest extends \PHPUnit_Framework_TestCase
 
         //================================================//
 
-        (new Pipeline())->pipe([
+        (new Pipeline())->pipe(null, [
             function ($ctx) {
                 $this->assertEquals("bar", $ctx->foo);
                 $ctx->str1 = 'hello';
@@ -79,7 +79,7 @@ class PipelineTest extends \PHPUnit_Framework_TestCase
             });
         }
 
-        $result = $pipeline->pipe([
+        $result = $pipeline->pipe(null, [
             function () {
                 return 'foo';
             }
@@ -95,7 +95,7 @@ class PipelineTest extends \PHPUnit_Framework_TestCase
     {
         ob_start();
 
-        (new Pipeline())->pipe([
+        (new Pipeline())->pipe(null, [
             function () {
                 echo 123;
                 yield;
@@ -117,7 +117,7 @@ class PipelineTest extends \PHPUnit_Framework_TestCase
 
         ob_start();
 
-        (new Pipeline)->pipe([
+        (new Pipeline)->pipe(null, [
             function () {
                 try {
                     yield;

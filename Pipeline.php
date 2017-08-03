@@ -70,8 +70,8 @@ class Pipeline
     }
 
     /**
-     * @param array $nodes
      * @param ContextInterface $context
+     * @param array $nodes
      * @return mixed|null
      */
     public function pipe(array $nodes = [], ContextInterface $context = null)
@@ -93,6 +93,7 @@ class Pipeline
                     $yieldValue = $generator->current();
 
                     // Todo 通过信号进行判断,暂停,跳过,更改参数
+                    // Todo 参考Zan实现
                     if ($yieldValue === false) {
                         // 打断中间件执行流程
                         return false;
@@ -121,7 +122,7 @@ class Pipeline
      * @return mixed
      * @throws Exception
      */
-    protected function tryCatch(\Exception $exception)
+    protected function tryCatch($exception)
     {
         if ($this->stack->isEmpty()) {
             throw $exception;
@@ -132,6 +133,8 @@ class Pipeline
             $generator->throw($exception);
             return $this->getResult($generator);
         } catch (\Exception $e) {
+            $this->tryCatch($e);
+        } catch (\Throwable $e) {
             $this->tryCatch($e);
         }
     }

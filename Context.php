@@ -31,14 +31,14 @@ class Context implements ContextInterface, ArrayAccess, Countable, IteratorAggre
 
     public function remove($key)
     {
-        if($this->has($key)){
+        if ($this->has($key)) {
             unset($this->items[$key]);
         }
     }
 
     public function replace(array $items)
     {
-        foreach($items as $offset => $item){
+        foreach ($items as $offset => $item) {
             $this->set($offset,$item);
         }
     }
@@ -53,9 +53,9 @@ class Context implements ContextInterface, ArrayAccess, Countable, IteratorAggre
         return $this->items;
     }
 
-    public function __set($name,$value)
+    public function __set($name, $value)
     {
-        $this->set($name,$value);
+        $this->set($name, $value);
     }
 
     public function __get($name)
